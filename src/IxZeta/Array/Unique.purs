@@ -20,28 +20,28 @@ data UniqueArrayUpdate value
   | UniqueArrayMove { indexOld :: Int, indexNew :: Int, value :: value }
   | UniqueArrayOverwrite { values :: UniqueArray value }
 
-newtype IxSignalArray (rw :: # S.SCOPE) value = IxSignalArray
+newtype IxSignalUniqueArray (rw :: # S.SCOPE) value = IxSignalUniqueArray
   { state :: Ref (UniqueArray value)
   , queue :: IxQueue (read :: Q.READ, write :: Q.WRITE) (UniqueArrayUpdate value)
   }
 
-instance signalScopeIxSignalArray :: S.SignalScope IxSignalArray where
-  readOnly (IxSignalArray x) = IxSignalArray x
-  writeOnly (IxSignalArray x) = IxSignalArray x
-  allowReading (IxSignalArray x) = IxSignalArray x
-  allowWriting (IxSignalArray x) = IxSignalArray x
+instance signalScopeIxSignalUniqueArray :: S.SignalScope IxSignalUniqueArray where
+  readOnly (IxSignalUniqueArray x) = IxSignalUniqueArray x
+  writeOnly (IxSignalUniqueArray x) = IxSignalUniqueArray x
+  allowReading (IxSignalUniqueArray x) = IxSignalUniqueArray x
+  allowWriting (IxSignalUniqueArray x) = IxSignalUniqueArray x
 
-new :: forall value. UniqueArray value -> Effect (IxSignalArray (read :: S.READ, write :: S.WRITE) value)
+new :: forall value. UniqueArray value -> Effect (IxSignalUniqueArray (read :: S.READ, write :: S.WRITE) value)
 new xs = do
   state <- Ref.new xs
   queue <- IxQueue.new
-  pure $ IxSignalArray { state, queue }
+  pure $ IxSignalUniqueArray { state, queue }
 
-get :: forall rw value. IxSignalArray (read :: S.READ | rw) value -> Effect (UniqueArray value)
-get (IxSignalArray {state}) = Ref.read state
+get :: forall rw value. IxSignalUniqueArray (read :: S.READ | rw) value -> Effect (UniqueArray value)
+get (IxSignalUniqueArray {state}) = Ref.read state
 
-append :: forall rw value. Eq value => value -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-append x (IxSignalArray {state, queue}) = do
+append :: forall rw value. Eq value => value -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+append x (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.snoc xs x of
     Nothing -> pure false
@@ -50,8 +50,8 @@ append x (IxSignalArray {state, queue}) = do
       IxQueue.broadcast queue (UniqueArrayAppend { index: UniqueArray.length xs, valueNew: x })
       pure true
 
-appendExcept :: forall rw value. Eq value => Array String -> value -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-appendExcept indicies x (IxSignalArray {state, queue}) = do
+appendExcept :: forall rw value. Eq value => Array String -> value -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+appendExcept indicies x (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.snoc xs x of
     Nothing -> pure false
@@ -60,8 +60,8 @@ appendExcept indicies x (IxSignalArray {state, queue}) = do
       IxQueue.broadcastExcept queue indicies (UniqueArrayAppend { index: UniqueArray.length xs, valueNew: x })
       pure true
 
-update :: forall rw value. Eq value => Int -> (value -> value) -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-update index f (IxSignalArray {state, queue}) = do
+update :: forall rw value. Eq value => Int -> (value -> value) -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+update index f (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.index xs index of
     Nothing -> pure false
@@ -72,8 +72,8 @@ update index f (IxSignalArray {state, queue}) = do
         IxQueue.broadcast queue (UniqueArrayUpdate {index, valueOld: x, valueNew: f x})
         pure true
 
-updateExcept :: forall rw value. Eq value => Array String -> Int -> (value -> value) -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-updateExcept indicies index f (IxSignalArray {state, queue}) = do
+updateExcept :: forall rw value. Eq value => Array String -> Int -> (value -> value) -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+updateExcept indicies index f (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.index xs index of
     Nothing -> pure false
@@ -84,8 +84,8 @@ updateExcept indicies index f (IxSignalArray {state, queue}) = do
         IxQueue.broadcastExcept queue indicies (UniqueArrayUpdate {index, valueOld: x, valueNew: f x})
         pure true
 
-delete :: forall rw value. Int -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-delete index (IxSignalArray {state, queue}) = do
+delete :: forall rw value. Int -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+delete index (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.index xs index of
     Nothing -> pure false
@@ -96,8 +96,8 @@ delete index (IxSignalArray {state, queue}) = do
         IxQueue.broadcast queue (UniqueArrayDelete {index, valueOld: x})
         pure true
 
-deleteExcept :: forall rw value. Array String -> Int -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-deleteExcept indicies index (IxSignalArray {state, queue}) = do
+deleteExcept :: forall rw value. Array String -> Int -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+deleteExcept indicies index (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.index xs index of
     Nothing -> pure false
@@ -108,18 +108,18 @@ deleteExcept indicies index (IxSignalArray {state, queue}) = do
         IxQueue.broadcastExcept queue indicies (UniqueArrayDelete {index, valueOld: x})
         pure true
 
-overwrite :: forall rw value. UniqueArray value -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Unit
-overwrite values (IxSignalArray {state, queue}) = do
+overwrite :: forall rw value. UniqueArray value -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Unit
+overwrite values (IxSignalUniqueArray {state, queue}) = do
   Ref.write values state
   IxQueue.broadcast queue (UniqueArrayOverwrite {values})
 
-overwriteExcept :: forall rw value. Array String -> UniqueArray value -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Unit
-overwriteExcept indicies values (IxSignalArray {state, queue}) = do
+overwriteExcept :: forall rw value. Array String -> UniqueArray value -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Unit
+overwriteExcept indicies values (IxSignalUniqueArray {state, queue}) = do
   Ref.write values state
   IxQueue.broadcastExcept queue indicies (UniqueArrayOverwrite {values})
 
-move :: forall rw value. Eq value => Int -> Int -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-move indexOld indexNew (IxSignalArray {state, queue}) = do
+move :: forall rw value. Eq value => Int -> Int -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+move indexOld indexNew (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.index xs indexOld of
     Nothing -> pure false
@@ -132,8 +132,8 @@ move indexOld indexNew (IxSignalArray {state, queue}) = do
           IxQueue.broadcast queue (UniqueArrayMove {indexOld, indexNew, value})
           pure true
 
-moveExcept :: forall rw value. Eq value => Array String -> Int -> Int -> IxSignalArray (write :: S.WRITE | rw) value -> Effect Boolean
-moveExcept indicies indexOld indexNew (IxSignalArray {state, queue}) = do
+moveExcept :: forall rw value. Eq value => Array String -> Int -> Int -> IxSignalUniqueArray (write :: S.WRITE | rw) value -> Effect Boolean
+moveExcept indicies indexOld indexNew (IxSignalUniqueArray {state, queue}) = do
   xs <- Ref.read state
   case UniqueArray.index xs indexOld of
     Nothing -> pure false
@@ -146,10 +146,10 @@ moveExcept indicies indexOld indexNew (IxSignalArray {state, queue}) = do
           IxQueue.broadcastExcept queue indicies (UniqueArrayMove {indexOld, indexNew, value})
           pure true
 
-subscribeLight :: forall rw value. String -> (UniqueArrayUpdate value -> Effect Unit) -> IxSignalArray (read :: S.READ | rw) value -> Effect Unit
-subscribeLight index handler (IxSignalArray {queue}) =
+subscribeLight :: forall rw value. String -> (UniqueArrayUpdate value -> Effect Unit) -> IxSignalUniqueArray (read :: S.READ | rw) value -> Effect Unit
+subscribeLight index handler (IxSignalUniqueArray {queue}) =
   IxQueue.on queue index handler
 
-unsubscribe :: forall rw value. String -> IxSignalArray (read :: S.READ | rw) value -> Effect Boolean
-unsubscribe index (IxSignalArray {queue}) =
+unsubscribe :: forall rw value. String -> IxSignalUniqueArray (read :: S.READ | rw) value -> Effect Boolean
+unsubscribe index (IxSignalUniqueArray {queue}) =
   IxQueue.del queue index
